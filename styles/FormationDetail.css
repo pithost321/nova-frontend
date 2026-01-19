@@ -1,0 +1,465 @@
+/* ============================================================================
+   FORMATION DETAIL STYLES
+   ============================================================================ */
+
+.formation-detail-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.formation-detail-loading,
+.formation-detail-error {
+  padding: 32px;
+  text-align: center;
+  font-size: 16px;
+}
+
+.formation-detail-error {
+  color: #c53030;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 8px;
+}
+
+.formation-detail-error button {
+  margin-top: 16px;
+  padding: 8px 24px;
+  background: #c53030;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* Header */
+.formation-detail-header {
+  position: relative;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.detail-header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.detail-title {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+  flex: 1;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.close-btn:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.detail-description {
+  margin: 0;
+  font-size: 16px;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* Session Progress */
+.session-progress {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 24px 0;
+  border-left: 4px solid #3498db;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+}
+
+.session-status {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-enrolled {
+  background: #cfe9ff;
+  color: #004085;
+}
+
+.status-in_progress {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.status-completed {
+  background: #d4edda;
+  color: #155724;
+}
+
+.status-abandoned {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 24px;
+  background: #e0e0e0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #d0d0d0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3498db, #2980b9);
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Metadata */
+.formation-metadata {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.meta-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.meta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  border-left: 3px solid #3498db;
+}
+
+.meta-row .label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+}
+
+.meta-row .value {
+  font-size: 15px;
+  color: #333;
+  font-weight: 500;
+}
+
+/* Chapters Section */
+.chapters-section {
+  margin: 24px 0;
+}
+
+.chapters-section h2 {
+  margin: 0 0 16px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
+}
+
+.no-chapters {
+  padding: 32px;
+  text-align: center;
+  color: #999;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-top: 16px;
+}
+
+.chapters-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chapter-item {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+  transition: all 0.3s;
+}
+
+.chapter-item:hover {
+  border-color: #3498db;
+  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.1);
+}
+
+.chapter-item.completed {
+  border-color: #27ae60;
+  background: #f0fdf4;
+}
+
+.chapter-header {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  background: #f8f9fa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+  transition: all 0.3s;
+}
+
+.chapter-item.completed .chapter-header {
+  background: #f0fdf4;
+}
+
+.chapter-header:hover {
+  background: #e8e9eb;
+}
+
+.chapter-number {
+  font-weight: 600;
+  color: #3498db;
+  min-width: 80px;
+}
+
+.chapter-item.completed .chapter-number {
+  color: #27ae60;
+}
+
+.chapter-title {
+  flex: 1;
+  text-align: left;
+}
+
+.completed-badge {
+  color: #27ae60;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.expand-icon {
+  color: #999;
+  font-size: 20px;
+  transition: transform 0.3s;
+  display: inline-block;
+}
+
+.expand-icon.expanded {
+  transform: rotate(90deg);
+}
+
+/* Chapter Content */
+.chapter-content {
+  padding: 16px;
+  background: white;
+  border-top: 1px solid #ddd;
+}
+
+.chapter-description,
+.chapter-duration,
+.chapter-video,
+.chapter-resources {
+  margin-bottom: 16px;
+}
+
+.chapter-description h4,
+.chapter-video h4,
+.chapter-resources h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.chapter-description p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.chapter-duration {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.chapter-duration .label {
+  font-weight: 600;
+  color: #555;
+}
+
+.chapter-duration span:last-child {
+  color: #999;
+}
+
+.chapter-video a,
+.chapter-resources a {
+  color: #3498db;
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.3s;
+}
+
+.chapter-video a:hover,
+.chapter-resources a:hover {
+  color: #2980b9;
+  text-decoration: underline;
+}
+
+.chapter-resources ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style: disc;
+}
+
+.chapter-resources li {
+  margin: 8px 0;
+}
+
+.complete-btn {
+  width: 100%;
+  margin-top: 12px;
+}
+
+/* Target Info */
+.target-info {
+  margin: 24px 0;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #3498db;
+}
+
+.target-info h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 6px 12px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #555;
+}
+
+/* Buttons */
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2980b9;
+}
+
+.btn-secondary {
+  background: #95a5a6;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #7f8c8d;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .formation-detail-container {
+    padding: 16px;
+  }
+
+  .detail-title {
+    font-size: 24px;
+  }
+
+  .meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-header-content {
+    flex-direction: column;
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+}

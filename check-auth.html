@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Auth</title>
+</head>
+<body>
+    <h1>Current Authentication Status</h1>
+    <div id="output"></div>
+    <script>
+        const token = localStorage.getItem('authToken');
+        const role = localStorage.getItem('userRole');
+        const email = localStorage.getItem('userEmail');
+        
+        document.getElementById('output').innerHTML = `
+            <p><strong>Email:</strong> ${email || 'Not logged in'}</p>
+            <p><strong>Role:</strong> ${role || 'Not set'}</p>
+            <p><strong>Token:</strong> ${token ? 'Present (length: ' + token.length + ')' : 'Missing'}</p>
+            ${token ? '<p><strong>Token:</strong> <code>' + token + '</code></p>' : ''}
+        `;
+    </script>
+</body>
+</html>

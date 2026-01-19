@@ -1,0 +1,426 @@
+
+/**
+ * Nova Call Center Analytics - Main Application Component
+ * 
+ * A comprehensive call center analytics dashboard supporting multiple user roles:
+ * - Agent: View personal performance metrics
+ * - Team Leader: Manage team, view team analytics, update agent rates
+ * - HQ: View organizational metrics across all teams
+ */
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { UserRole, Agent, Team } from './types';
+import { dashboardAPI, authAPI, agentAPI, teamAPI } from './services/apiService';
+import Sidebar from './components/Sidebar';
+import LoginPage from './components/LoginPage';
+
+const App: React.FC = () => {
+  // ============================================================================
+  // Authentication State
+  // ============================================================================
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [currentRole, setCurrentRole] = useState<UserRole>(UserRole.AGENT);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+
+  // ============================================================================
+  // Data State
+  // ============================================================================
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // ============================================================================
+  // Application State
+  // ============================================================================
+  
+  // User role and dashboard settings
+  const [currentRole, setCurrentRole] = useState<UserRole>(UserRole.AGENT);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>(TimePeriod.TODAY);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Data loading state
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [isHealthy, setIsHealthy] = useState(true);
+  const [teams, setTeams] = useState<Team[]>(MOCK_TEAMS);
+
+  // Agent selection and data management
+  const [selectedAgentId, setSelectedAgentId] = useState(MOCK_AGENTS[0].id);
+  const [agents, setAgents] = useState<Agent[]>(MOCK_AGENTS);
+  const currentAgent = useMemo(
+    () => agents.find(a => a.id === selectedAgentId) || agents[0],
+    [selectedAgentId, agents]
+  );
+
+  // Team selection
+  const [selectedTeamId] = useState(MOCK_TEAMS[0].id);
+  const currentTeam = useMemo(
+    () => teams.find(t => t.id === selectedTeamId) || teams[0],
+    [selectedTeamId, teams]
+  );
+
+  // ============================================================================
+  // Session Restoration on Mount
+  // ============================================================================
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const storedEmail = localStorage.getItem('userEmail');
+        const storedRole = localStorage.getItem('userRole');
+
+        if (storedEmail && storedRole) {
+          setCurrentUserEmail(storedEmail);
+          setCurrentRole(storedRole as UserRole);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error('Session restoration error:', error);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
+
+  // ============================================================================
+  // Authentication Handlers
+  // ============================================================================
+
+  const handleLogin = async (email: string, role: UserRole) => {
+    setIsAuthLoading(true);
+    try {
+      await authAPI.login(email, role);
+      localStorage.setItem('userEmail', email);
+      localStorage.setItem('userRole', role);
+      setCurrentUserEmail(email);
+      setCurrentRole(role);
+      setIsAuthenticated(true);
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+      localStorage.removeItem('userEmail');
+      localStorage.removeItem('userRole');
+      setCurrentUserEmail('');
+      setCurrentRole(UserRole.AGENT);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  // ============================================================================
+  // Data Fetching from Backend
+  // ============================================================================
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Check backend health
+        const healthy = await dashboardAPI.healthCheck();
+        setIsHealthy(healthy);
+
+        if (healthy) {
+          try {
+            // Fetch real data from backend
+            const fullView = await dashboardAPI.getFullView();
+            
+            // Transform backend data to frontend format
+            if (fullView.teams && Array.isArray(fullView.teams)) {
+              const transformedTeams: Team[] = fullView.teams.map((t: any) => ({
+                id: t.id?.toString() || t.username,
+                name: t.username || 'Unknown Team',
+                leaderId: `leader-${t.id}`,
+                office: 'Remote',
+              }));
+              setTeams(transformedTeams);
+            }
+
+            if (fullView.agents && Array.isArray(fullView.agents)) {
+              const transformedAgents: Agent[] = fullView.agents.map((a: any) => ({
+                id: a.id_agent?.toString() || a.ID?.toString() || 'unknown',
+                name: a.username || 'Unknown Agent',
+                email: `${a.username}@company.com`,
+                role: 'agent',
+                teamId: a.mostCurrentUserGroup || 'unknown',
+                performance: {
+                  today: {
+                    calls: a.calls || 0,
+                    booked: a.SALE || 0,
+                    talkTimeMinutes: a.talk ? Math.floor(a.talk.hour * 60 + a.talk.minute) : 0,
+                  },
+                  thisWeek: {
+                    calls: (a.calls || 0) * 5,
+                    booked: (a.SALE || 0) * 5,
+                    talkTimeMinutes: a.talk ? Math.floor((a.talk.hour * 60 + a.talk.minute) * 5) : 0,
+                  },
+                  thisMonth: {
+                    calls: (a.calls || 0) * 20,
+                    booked: (a.SALE || 0) * 20,
+                    talkTimeMinutes: a.talk ? Math.floor((a.talk.hour * 60 + a.talk.minute) * 20) : 0,
+                  },
+                },
+              }));
+              setAgents(transformedAgents);
+            }
+          } catch (backendErr) {
+            console.warn('Backend fetch failed, using mock data:', backendErr);
+            setTeams(MOCK_TEAMS);
+            setAgents(MOCK_AGENTS);
+          }
+        } else {
+          // Use mock data as fallback
+          setTeams(MOCK_TEAMS);
+          setAgents(MOCK_AGENTS);
+        }
+
+        setLastUpdated(new Date());
+      } catch (err) {
+        console.error('Failed to fetch dashboard data:', err);
+        setError('Using local demo data');
+        setIsHealthy(false);
+        // Keep mock data as fallback
+        setTeams(MOCK_TEAMS);
+        setAgents(MOCK_AGENTS);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Only fetch if authenticated
+    if (isAuthenticated && !isAuthLoading) {
+      fetchDashboardData();
+    }
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchDashboardData, 30000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, isAuthLoading]);
+
+  // ============================================================================
+  // Authentication Gate
+  // ============================================================================
+
+  if (!isAuthenticated && !isAuthLoading) {
+    return <LoginPage onLogin={handleLogin} isLoading={isAuthLoading} />;
+  }
+
+  // ============================================================================
+  // Error/Loading Display
+  // ============================================================================
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="inline-block">
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+          </div>
+          <p className="mt-4 text-slate-600 font-semibold">Loading dashboard data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // Event Handlers
+  // ============================================================================
+
+  /**
+   * Updates an agent's information
+   * @param agentId - ID of the agent to update
+   * @param updates - Partial agent data to merge
+   */
+  const handleUpdateAgent = (agentId: string, updates: Partial<Agent>) => {
+    setAgents(prevAgents =>
+      prevAgents.map(agent =>
+        agent.id === agentId ? { ...agent, ...updates } : agent
+      )
+    );
+  };
+
+  /**
+   * Adds a new agent to the system
+   * @param newAgent - Agent data without ID
+   */
+  const handleAddAgent = (newAgent: Omit<Agent, 'id'>) => {
+    const id = `agent_${Date.now()}`;
+    setAgents(prevAgents => [...prevAgents, { ...newAgent, id } as Agent]);
+  };
+
+  /**
+   * Renders the appropriate dashboard based on current role
+   */
+  const renderDashboard = () => {
+    switch (currentRole) {
+      case UserRole.AGENT:
+        return (
+          <AgentDashboard
+            agent={currentAgent}
+            period={timePeriod}
+            agents={agents}
+            clients={MOCK_CLIENTS}
+            onUpdateAgent={handleUpdateAgent}
+          />
+        );
+      case UserRole.TEAM_LEADER:
+        return (
+          <TeamDashboard
+            team={currentTeam}
+            agents={agents}
+            period={timePeriod}
+            teams={teams}
+            onSelectAgent={(agentId) => {
+              setSelectedAgentId(agentId);
+              setCurrentRole(UserRole.AGENT);
+            }}
+            onAddAgent={handleAddAgent}
+            onUpdateAgent={handleUpdateAgent}
+          />
+        );
+      case UserRole.HQ:
+        return (
+          <HQDashboard
+            teams={teams}
+            agents={agents}
+            period={timePeriod}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  // ============================================================================
+  // Render
+  // ============================================================================
+
+  return (
+    <div className="flex min-h-screen bg-slate-50 text-slate-900 overflow-hidden">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        currentRole={currentRole}
+        onRoleChange={setCurrentRole}
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+      />
+
+      {/* Main Content Area */}
+      <main
+        className={`flex-1 overflow-y-auto transition-all duration-500 ease-in-out ${
+          isSidebarOpen ? 'md:ml-72' : 'ml-0'
+        }`}
+      >
+        {/* Header */}
+        <header className="sticky top-0 z-10 glass border-b border-slate-200 px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm">
+          <div className="flex items-center gap-4">
+            {/* Sidebar Toggle */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all active:scale-95"
+              title={isSidebarOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+              aria-label="Toggle Sidebar"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                {isSidebarOpen ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                )}
+              </svg>
+            </button>
+
+            {/* Time Period Selector */}
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg shadow-inner">
+              {Object.values(TimePeriod).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setTimePeriod(period)}
+                  className={`px-4 py-1.5 text-xs font-bold rounded-md uppercase tracking-widest transition-all ${
+                    timePeriod === period
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-slate-500 hover:bg-slate-200'
+                  }`}
+                  aria-pressed={timePeriod === period}
+                >
+                  {period}
+                </button>
+              ))}
+            </div>
+
+            {/* Data Status Indicator */}
+            <div className="hidden md:block pl-4 border-l border-slate-200">
+              <DataStatus
+                lastUpdated={lastUpdated}
+                loading={loading}
+                error={error}
+                isHealthy={isHealthy}
+              />
+            </div>
+          </div>
+
+          {/* User Info */}
+          <div className="flex items-center gap-6">
+            <div className="hidden md:flex flex-col items-end">
+              <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">
+                Active Role
+              </p>
+              <p className="text-sm font-bold text-slate-800">
+                {currentRole.replace('_', ' ')}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">{currentUserEmail}</p>
+            </div>
+            <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-blue-600 font-black shadow-sm ring-2 ring-blue-50 ring-offset-2">
+              {currentRole[0]}
+            </div>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+              title="Logout"
+            >
+              Logout
+            </button>
+          </div>
+        </header>
+
+        {/* Dashboard Content */}
+        <div className="p-6 md:p-8 max-w-7xl mx-auto">
+          {renderDashboard()}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default App;
