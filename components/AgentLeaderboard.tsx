@@ -12,12 +12,53 @@ interface AgentData {
   rdv_per_hour: number;
   cost_per_rdv: number;
   campaign?: string;
+  rank?: number;
+  // API fields
+  totalCalls?: number;
+  totalPaidTimeHours?: number;
+  costPerHour?: number;
+  loginTimeHours?: number;
+  dispoTimeHours?: number;
+  deadTimeHours?: number;
+  talkTimeHours?: number;
+  talkTimePercentage?: string;
+  estimatedEarnings?: number;
+  callbk?: number;
+  n?: number;
+  ni?: number;
+  booked?: number;
+  pauseTimeHours?: number;
+  paidPauseHours?: number;
+  customerTimeHours?: number;
+  waitTimeHours?: number;
+  waitTimePercentage?: string;
+  workingDays?: number;
 }
 
-type DateFilter = 'today' | 'yesterday' | 'this-week';
+type DateFilter = 'today' | 'yesterday' | 'this-week' | 'year';
 type SortField = 'rdv_count' | 'rdv_per_hour' | 'cost_per_rdv' | 'calls' | 'hours_worked' | 'cost_total';
 
-const AgentLeaderboard: React.FC = () => {
+type ColumnMetric = 
+  | 'totalCalls' 
+  | 'totalPaidTimeHours' 
+  | 'costPerHour' 
+  | 'loginTimeHours' 
+  | 'dispoTimeHours' 
+  | 'deadTimeHours' 
+  | 'talkTimeHours' 
+  | 'talkTimePercentage' 
+  | 'estimatedEarnings' 
+  | 'callbk' 
+  | 'n' 
+  | 'ni' 
+  | 'booked'
+  | 'workingDays';
+
+interface AgentLeaderboardProps {
+  onSelectAgent?: (agentId: number, agentName: string) => void;
+}
+
+const AgentLeaderboard: React.FC<AgentLeaderboardProps> = ({ onSelectAgent }) => {
   const [agents, setAgents] = useState<AgentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,6 +67,83 @@ const AgentLeaderboard: React.FC = () => {
   const [sortField, setSortField] = useState<SortField>('rdv_count');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [campaigns, setCampaigns] = useState<string[]>(['NOVA_ECO', 'NOVA_PREMIUM', 'NOVA_CLASSIC']);
+  const [historyStats, setHistoryStats] = useState<AgentData | null>(null);
+  const [selectedColumns, setSelectedColumns] = useState<ColumnMetric[]>([
+    'totalCalls',
+    'totalPaidTimeHours',
+    'costPerHour',
+    'workingDays',
+  ]);
+  const [showColumnDropdown, setShowColumnDropdown] = useState(false);
+
+  const availableMetrics: { key: ColumnMetric; label: string }[] = [
+    { key: 'totalCalls', label: 'Total Appels' },
+    { key: 'totalPaidTimeHours', label: 'Heures travaillées' },
+    { key: 'costPerHour', label: 'Coût/Heure' },
+    { key: 'loginTimeHours', label: 'Heures de connexion' },
+    { key: 'dispoTimeHours', label: 'Heures Dispo' },
+    { key: 'deadTimeHours', label: 'Heures Dead' },
+    { key: 'talkTimeHours', label: 'Heures Talk' },
+    { key: 'talkTimePercentage', label: 'Talk %%' },
+    { key: 'estimatedEarnings', label: 'Gains estimés' },
+    { key: 'callbk', label: 'Callback' },
+    { key: 'n', label: 'N' },
+    { key: 'ni', label: 'NI' },
+    { key: 'booked', label: 'Réservé' },
+    { key: 'workingDays', label: 'Jour travaillé' },
+  ];
+
+  // Fetch working days from Performance Metrics API (once for all agents)
+  const fetchAllWorkingDays = async (): Promise<Map<number, number>> => {
+    try {
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        console.warn('No auth token available');
+        return new Map();
+      }
+
+      const response = await fetch('https://novaadmin.ca/api/test/history/all', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('Failed to fetch working days:', response.status, response.statusText);
+        return new Map();
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data)) {
+        console.warn('Working days data is not an array');
+        return new Map();
+      }
+
+      // Count working days by agent ID (try multiple possible field names)
+      const workingDaysMap = new Map<number, number>();
+      
+      data.forEach((item: any) => {
+        // Try multiple possible field names for agent ID
+        const agentId = item.vicidialId || item.agentId || (item.vicidialId && parseInt(item.vicidialId));
+        
+        if (agentId) {
+          const id = typeof agentId === 'string' ? parseInt(agentId) : agentId;
+          if (!isNaN(id)) {
+            workingDaysMap.set(id, (workingDaysMap.get(id) || 0) + 1);
+          }
+        }
+      });
+
+      console.log('Working days calculated:', workingDaysMap);
+      console.log('Sample of data received:', data.length > 0 ? data[0] : 'No data');
+      return workingDaysMap;
+    } catch (err) {
+      console.error('Error fetching working days:', err);
+      return new Map();
+    }
+  };
 
   // Calculate metrics from API response
   const calculateMetrics = (agent: any): AgentData => {
@@ -49,6 +167,27 @@ const AgentLeaderboard: React.FC = () => {
       rdv_per_hour,
       cost_per_rdv,
       campaign: agent.campaign,
+      rank: agent.rank,
+      // Preserve all API fields
+      totalCalls: agent.totalCalls || 0,
+      totalPaidTimeHours: agent.totalPaidTimeHours || 0,
+      costPerHour: agent.costPerHour || 0,
+      loginTimeHours: agent.loginTimeHours || 0,
+      dispoTimeHours: agent.dispoTimeHours || 0,
+      deadTimeHours: agent.deadTimeHours || 0,
+      talkTimeHours: agent.talkTimeHours || 0,
+      talkTimePercentage: agent.talkTimePercentage || '0%',
+      estimatedEarnings: agent.estimatedEarnings || 0,
+      callbk: agent.callbk || 0,
+      n: agent.n || 0,
+      ni: agent.ni || 0,
+      booked: agent.booked || 0,
+      pauseTimeHours: agent.pauseTimeHours || 0,
+      paidPauseHours: agent.paidPauseHours || 0,
+      customerTimeHours: agent.customerTimeHours || 0,
+      waitTimeHours: agent.waitTimeHours || 0,
+      waitTimePercentage: agent.waitTimePercentage || '0%',
+      workingDays: agent.workingDays || 0,
     };
   };
 
@@ -63,6 +202,20 @@ const AgentLeaderboard: React.FC = () => {
         console.log('User role:', userRole);
         
         let allAgents: AgentData[] = [];
+
+        // Fetch history stats for yearly data (only for AGENT and TEAM roles)
+        if (userRole === 'AGENT' || userRole === 'TEAM') {
+          try {
+            const historyData = await agentAPI.getHistory('YEAR');
+            console.log('History data received:', historyData);
+            if (historyData) {
+              setHistoryStats(calculateMetrics(historyData));
+            }
+          } catch (historyErr) {
+            console.warn('Failed to fetch history stats:', historyErr);
+            setHistoryStats(null);
+          }
+        }
 
         if (userRole === 'NOVA') {
           // NOVA: Fetch all agents from all teams
@@ -114,15 +267,39 @@ const AgentLeaderboard: React.FC = () => {
           return;
         }
 
-        let data: AgentData[] = uniqueAgents;
+        // Fetch all working days at once
+        const workingDaysMap = await fetchAllWorkingDays();
+
+        // Add working days to each agent
+        const agentsWithWorkingDays = uniqueAgents.map((agent) => {
+          const workingDaysValue = workingDaysMap.get(agent.agent_id as number) || 0;
+          if (agent.agent_id === 754 || agent.agent_id === 301) {
+            console.log(`Agent ${agent.agent_name} (ID: ${agent.agent_id}): workingDays = ${workingDaysValue}`);
+          }
+          return {
+            ...agent,
+            workingDays: workingDaysValue
+          };
+        });
+
+        let data: AgentData[] = agentsWithWorkingDays;
 
         // Filter by campaign
         if (campaignFilter !== 'all') {
           data = data.filter(agent => agent.campaign === campaignFilter);
         }
 
-        // Sort data
+        // Sort data: First by rank, then by selected metric
         data.sort((a, b) => {
+          // Primary sort: by rank (ascending - rank 1 first)
+          const rankA = a.rank || Infinity;
+          const rankB = b.rank || Infinity;
+          
+          if (rankA !== rankB) {
+            return rankA - rankB; // Lower rank number comes first
+          }
+          
+          // Secondary sort: by selected field for agents with same rank
           const aVal = a[sortField];
           const bVal = b[sortField];
           return sortDirection === 'desc' ? (bVal > aVal ? 1 : -1) : (aVal > bVal ? 1 : -1);
@@ -167,6 +344,51 @@ const AgentLeaderboard: React.FC = () => {
     }
   };
 
+  // Handle column selection
+  const handleColumnToggle = (metric: ColumnMetric) => {
+    setSelectedColumns(prev =>
+      prev.includes(metric)
+        ? prev.filter(m => m !== metric)
+        : [...prev, metric]
+    );
+  };
+
+  // Get metric value from agent
+  const getMetricValue = (agent: any, metric: ColumnMetric): string | number => {
+    switch (metric) {
+      case 'totalCalls':
+        return agent.totalCalls || 0;
+      case 'totalPaidTimeHours':
+        return (agent.totalPaidTimeHours || 0).toFixed(2);
+      case 'costPerHour':
+        return (agent.costPerHour || 0).toFixed(2);
+      case 'loginTimeHours':
+        return (agent.loginTimeHours || 0).toFixed(2);
+      case 'dispoTimeHours':
+        return (agent.dispoTimeHours || 0).toFixed(2);
+      case 'deadTimeHours':
+        return (agent.deadTimeHours || 0).toFixed(2);
+      case 'talkTimeHours':
+        return (agent.talkTimeHours || 0).toFixed(2);
+      case 'talkTimePercentage':
+        return agent.talkTimePercentage || '0%';
+      case 'estimatedEarnings':
+        return (agent.estimatedEarnings || 0).toFixed(2);
+      case 'callbk':
+        return agent.callbk || 0;
+      case 'n':
+        return agent.n || 0;
+      case 'ni':
+        return agent.ni || 0;
+      case 'booked':
+        return agent.booked || 0;
+      case 'workingDays':
+        return agent.workingDays || 0;
+      default:
+        return '0';
+    }
+  };
+
   // Get avatar color
   const getAvatarColor = (name: string) => {
     const colors = ['bg-blue-500', 'bg-green-500', 'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-red-500', 'bg-yellow-500'];
@@ -193,6 +415,7 @@ const AgentLeaderboard: React.FC = () => {
       case 'today': return "Aujourd'hui";
       case 'yesterday': return 'Hier';
       case 'this-week': return 'Cette semaine';
+      case 'year': return 'Cette année';
       default: return "Aujourd'hui";
     }
   };
@@ -217,7 +440,7 @@ const AgentLeaderboard: React.FC = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Campagne</label>
               <select
@@ -249,6 +472,57 @@ const AgentLeaderboard: React.FC = () => {
               </select>
             </div>
           </div>
+          
+          {/* Column Filter */}
+          {/*<div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">Colonnes à afficher</label>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              {availableMetrics.map((metric) => (
+                <label key={metric.key} className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedColumns.includes(metric.key)}
+                    onChange={() => handleColumnToggle(metric.key)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">{metric.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>*/}
+
+          {/* Column Filter Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowColumnDropdown(!showColumnDropdown)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md text-left bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between hover:bg-gray-50"
+            >
+              <span className="text-sm font-medium text-gray-700">
+                Colonnes ({selectedColumns.length}/{availableMetrics.length})
+              </span>
+              <span className={`transition-transform ${showColumnDropdown ? 'transform rotate-180' : ''}`}>
+                ▼
+              </span>
+            </button>
+            
+            {showColumnDropdown && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-3">
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {availableMetrics.map((metric) => (
+                    <label key={metric.key} className="flex items-center cursor-pointer hover:bg-gray-50 p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={selectedColumns.includes(metric.key)}
+                        onChange={() => handleColumnToggle(metric.key)}
+                        className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">{metric.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* KPI Cards */}
@@ -257,8 +531,8 @@ const AgentLeaderboard: React.FC = () => {
             <div className="flex items-center">
               <div className="flex-shrink-0 text-3xl">✅</div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total RDV</p>
-                <p className="text-2xl font-bold text-gray-900">{totals.rdv_count}</p>
+                <p className="text-sm font-medium text-gray-600">Total RDV <span className="text-xs text-gray-400">(Cette année)</span></p>
+                <p className="text-2xl font-bold text-gray-900">{historyStats?.rdv_count || totals.rdv_count}</p>
               </div>
             </div>
           </div>
@@ -266,8 +540,8 @@ const AgentLeaderboard: React.FC = () => {
             <div className="flex items-center">
               <div className="flex-shrink-0 text-3xl">€</div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Coût moyen / RDV</p>
-                <p className="text-2xl font-bold text-gray-900">{avgCostPerRdv}€</p>
+                <p className="text-sm font-medium text-gray-600">Coût moyen / RDV <span className="text-xs text-gray-400">(Cette année)</span></p>
+                <p className="text-2xl font-bold text-gray-900">{historyStats ? historyStats.cost_per_rdv.toFixed(2) : avgCostPerRdv}€</p>
               </div>
             </div>
           </div>
@@ -275,8 +549,8 @@ const AgentLeaderboard: React.FC = () => {
             <div className="flex items-center">
               <div className="flex-shrink-0 text-3xl">⏱️</div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Heures totales</p>
-                <p className="text-2xl font-bold text-gray-900">{totals.hours_worked.toFixed(1)}h</p>
+                <p className="text-sm font-medium text-gray-600">Heures totales <span className="text-xs text-gray-400">(Cette année)</span></p>
+                <p className="text-2xl font-bold text-gray-900">{historyStats ? historyStats.hours_worked.toFixed(1) : totals.hours_worked.toFixed(1)}h</p>
               </div>
             </div>
           </div>
@@ -284,8 +558,8 @@ const AgentLeaderboard: React.FC = () => {
             <div className="flex items-center">
               <div className="flex-shrink-0 text-3xl">📱</div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Appels totaux</p>
-                <p className="text-2xl font-bold text-gray-900">{totals.calls}</p>
+                <p className="text-sm font-medium text-gray-600">Appels totaux <span className="text-xs text-gray-400">(Cette année)</span></p>
+                <p className="text-2xl font-bold text-gray-900">{historyStats?.calls || totals.calls}</p>
               </div>
             </div>
           </div>
@@ -313,57 +587,38 @@ const AgentLeaderboard: React.FC = () => {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rang</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Agent</th>
-                    <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('hours_worked')}
-                    >
-                      Heures travaillées {sortField === 'hours_worked' && (sortDirection === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('calls')}
-                    >
-                      Appels {sortField === 'calls' && (sortDirection === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('rdv_count')}
-                    >
-                      RDV {sortField === 'rdv_count' && (sortDirection === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('rdv_per_hour')}
-                    >
-                      RDV/heure {sortField === 'rdv_per_hour' && (sortDirection === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('cost_total')}
-                    >
-                      Coût total {sortField === 'cost_total' && (sortDirection === 'desc' ? '↓' : '↑')}
-                    </th>
-                    <th
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                      onClick={() => handleSort('cost_per_rdv')}
-                    >
-                      Coût/RDV {sortField === 'cost_per_rdv' && (sortDirection === 'desc' ? '↓' : '↑')}
-                    </th>
+                    {selectedColumns.map((metric) => {
+                      const metricLabel = availableMetrics.find(m => m.key === metric)?.label || metric;
+                      return (
+                        <th
+                          key={metric}
+                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                          onClick={() => {
+                            if (metric === 'totalCalls') handleSort('calls');
+                            else if (metric === 'totalPaidTimeHours') handleSort('hours_worked');
+                            else if (metric === 'booked') handleSort('rdv_count');
+                          }}
+                        >
+                          {metricLabel}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {agents.map((agent, index) => {
-                    const rank = index + 1;
-                    const isTop3 = rank <= 3;
+                    const apiRank = agent.rank || (index + 1);
+                    const isTop3 = apiRank <= 3;
                     return (
                       <tr
                         key={agent.agent_id}
-                        className={`${isTop3 ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50'}`}
+                        onClick={() => onSelectAgent && onSelectAgent(Number(agent.agent_id), agent.agent_name)}
+                        className={`cursor-pointer transition-colors ${isTop3 ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-100'}`}
                       >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
-                            {getMedal(rank) && <span className="text-lg">{getMedal(rank)}</span>}
-                            <span className="text-sm font-medium text-gray-900">#{rank}</span>
+                            {getMedal(apiRank) && <span className="text-lg">{getMedal(apiRank)}</span>}
+                            <span className="text-sm font-medium text-gray-900">#{apiRank}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -374,25 +629,16 @@ const AgentLeaderboard: React.FC = () => {
                               {getInitials(agent.agent_name)}
                             </div>
                             <div>
-                              <div className="text-sm font-medium text-gray-900">{agent.agent_name}</div>
+                              <div className="text-sm font-medium text-gray-900 hover:text-blue-600">{agent.agent_name}</div>
                               <div className="text-sm text-gray-500">ID: {agent.agent_id}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {agent.hours_worked.toFixed(1)}h
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{agent.calls}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {agent.rdv_count}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{agent.rdv_per_hour}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {agent.cost_total.toFixed(2)}€
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {agent.cost_per_rdv.toFixed(2)}€
-                        </td>
+                        {selectedColumns.map((metric) => (
+                          <td key={`${agent.agent_id}-${metric}`} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {getMetricValue(agent, metric)}
+                          </td>
+                        ))}
                       </tr>
                     );
                   })}
@@ -402,16 +648,15 @@ const AgentLeaderboard: React.FC = () => {
                     <td colSpan={2} className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                       TOTAL NOVA
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {totals.hours_worked.toFixed(1)}h
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{totals.calls}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{totals.rdv_count}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{avgRdvPerHour}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {totals.cost_total.toFixed(2)}€
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{avgCostPerRdv}€</td>
+                    {selectedColumns.map((metric) => (
+                      <td key={`total-${metric}`} className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {metric === 'totalCalls' && totals.calls}
+                        {metric === 'totalPaidTimeHours' && totals.hours_worked.toFixed(1)}
+                        {metric === 'costPerHour' && (totals.hours_worked > 0 ? (18).toFixed(2) : '0.00')}
+                        {metric === 'booked' && totals.rdv_count}
+                        {!['totalCalls', 'totalPaidTimeHours', 'costPerHour', 'booked'].includes(metric) && '0'}
+                      </td>
+                    ))}
                   </tr>
                 </tfoot>
               </table>

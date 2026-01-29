@@ -22,10 +22,10 @@ interface SidebarProps {
   onToggle: () => void;
   /** Callback triggered when logout is clicked */
   onLogout: () => void;
-  /** Current view (dashboard, leaderboard, formations, or management) */
-  currentView?: 'dashboard' | 'leaderboard' | 'formations' | 'management';
+  /** Current view (dashboard, leaderboard, formations, management, or client-database) */
+  currentView?: 'dashboard' | 'leaderboard' | 'agent-detail' | 'formations' | 'formation-detail' | 'formation-learner' | 'management' | 'client-database';
   /** Callback for view changes */
-  onViewChange?: (view: 'dashboard' | 'leaderboard' | 'formations' | 'management') => void;
+  onViewChange?: (view: 'dashboard' | 'leaderboard' | 'formations' | 'management' | 'client-database') => void;
 }
 
 /**
@@ -157,6 +157,23 @@ const Sidebar: React.FC<SidebarProps> = ({ currentRole, userEmail, onRoleChange,
 
                 <button
                   onClick={() => {
+                    onViewChange?.('client-database');
+                    if (window.innerWidth < 1024) onToggle();
+                  }}
+                  className={`w-full px-4 py-3 rounded-lg text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-3 ${
+                    currentView === 'client-database'
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                      : 'bg-slate-800/40 text-slate-300 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM9 16a3 3 0 11-6 0 3 3 0 016 0zM16.7 5.3a1 1 0 00-1.4-1.4L12 7.6 9.7 5.3a1 1 0 00-1.4 1.4l2.3 2.3-2.3 2.3a1 1 0 101.4 1.4L12 10.4l2.3 2.3a1 1 0 001.4-1.4l-2.3-2.3 2.3-2.3z" />
+                  </svg>
+                  <span>Client Database</span>
+                </button>
+
+                {/* <button
+                  onClick={() => {
                     onViewChange?.('formations');
                     if (window.innerWidth < 1024) onToggle();
                   }}
@@ -170,10 +187,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentRole, userEmail, onRoleChange,
                     <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.669 0-3.218.51-4.5 1.385A7.968 7.968 0 009 4.804z" />
                   </svg>
                   <span>Formations</span>
-                </button>
+                </button> */}
 
                 {/* Formation Management - NOVA Only */}
-                {currentRole === 'NOVA' && (
+                {/*{currentRole === 'NOVA' && (
                   <button
                     onClick={() => {
                       onViewChange?.('management');
@@ -190,7 +207,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentRole, userEmail, onRoleChange,
                     </svg>
                     <span>Management</span>
                   </button>
-                )}
+                )} */}
               </div>
             )}
           </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Chapter } from '../types';
+import { Chapter, ContentType } from '../types';
 import { VideoPlayer } from './VideoPlayer';
 // @ts-ignore
 import '../styles/FormationLearner.css';
@@ -13,7 +13,7 @@ export const ChapterViewer: React.FC<ChapterViewerProps> = ({ chapter, isComplet
   return (
     <div className="chapter-viewer">
       {/* Video Content */}
-      {chapter.contentType === 'VIDEO' && chapter.contentUrl && (
+      {chapter.contentType === ContentType.VIDEO && chapter.contentUrl && (
         <div className="content-block video-content">
           <VideoPlayer 
             src={chapter.contentUrl}
@@ -24,7 +24,7 @@ export const ChapterViewer: React.FC<ChapterViewerProps> = ({ chapter, isComplet
       )}
 
       {/* Text Content */}
-      {chapter.contentType === 'TEXT' && chapter.textContent && (
+      {chapter.contentType === ContentType.TEXT && chapter.textContent && (
         <div className="content-block text-content">
           <div className="content-text">
             {chapter.textContent.split('\n').map((paragraph, idx) => (
@@ -35,7 +35,7 @@ export const ChapterViewer: React.FC<ChapterViewerProps> = ({ chapter, isComplet
       )}
 
       {/* Image Content */}
-      {chapter.contentType === 'IMAGE' && chapter.contentUrl && (
+      {chapter.contentType === ContentType.IMAGE && chapter.contentUrl && (
         <div className="content-block image-content">
           <figure>
             <img 
@@ -49,7 +49,7 @@ export const ChapterViewer: React.FC<ChapterViewerProps> = ({ chapter, isComplet
       )}
 
       {/* Document Content */}
-      {chapter.contentType === 'DOCUMENT' && chapter.contentUrl && (
+      {chapter.contentType === ContentType.DOCUMENT && chapter.contentUrl && (
         <div className="content-block document-content">
           <div className="document-preview">
             <div className="document-icon">📄</div>

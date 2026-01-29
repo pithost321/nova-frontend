@@ -34,10 +34,42 @@ export const FormationLearner: React.FC<FormationLearnerProps> = ({
 
   const handleEnroll = async () => {
     try {
+      const userRole = localStorage.getItem('userRole');
+      console.log('[FormationLearner] Attempting to enroll in formation:', formationId);
+      console.log('[FormationLearner] Current user role:', userRole);
+      
       await enrollFormation(formationId);
+      console.log('[FormationLearner] Enrollment successful');
       setIsEnrolled(true);
-    } catch (err) {
-      alert('Failed to enroll in formation');
+    } catch (err: any) {
+      const userRole = localStorage.getItem('userRole');
+      console.error('[FormationLearner] Enrollment failed:', {
+        message: err.message,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        url: err.config?.url,
+        userRole
+      });
+      
+      let errorMessage = 'Failed to enroll in formation';
+      
+      // Role-specific error messages
+      if (userRole === 'NOVA' && err.response?.status === 403) {
+        errorMessage = 'NOVA (Admin) users cannot enroll in formations.\n\nPlease switch to an AGENT or TEAM account to enroll in training.';
+      } else if (err.response?.status === 403) {
+        errorMessage = `403 Forbidden - You do not have permission to enroll.\nYour role: ${userRole}`;
+      } else if (err.response?.status === 401) {
+        errorMessage = '401 Unauthorized - Your session has expired. Please log in again.';
+      } else if (err.response?.status === 400) {
+        errorMessage = `400 Bad Request - ${err.response?.data?.message || 'Invalid formation or user data'}`;
+      } else if (err.response?.status === 404) {
+        errorMessage = '404 Not Found - Formation does not exist';
+      } else if (err.response?.data?.message) {
+        errorMessage = `Error: ${err.response.data.message}`;
+      }
+      
+      alert(errorMessage);
       console.error(err);
     }
   };

@@ -153,8 +153,22 @@ const AgentDashboard: React.FC<AgentDashboardProps> = ({ agent, period, agents =
         // 1. Fetch Top 5 Agents (AgentStatsDTO[])
         const top5Data: AgentStatsDTO[] = await agentAPI.getTop5Agents();
 
-        // 2. Fetch My Personal Stats (AgentStatsDTO)
-        const myStatsData: AgentStatsDTO = await agentAPI.getMyStats();
+        // 2. Fetch My Personal Stats based on period
+        let myStatsData: AgentStatsDTO;
+        if (period === TimePeriod.WEEK) {
+          // For WEEK, call getHistory
+          myStatsData = await agentAPI.getHistory('WEEK');
+          console.log('Fetched WEEK stats:', myStatsData);
+        } else if (period === TimePeriod.MONTH) {
+          // For MONTH, call getHistory
+          myStatsData = await agentAPI.getHistory('MONTH');
+          console.log('Fetched MONTH stats:', myStatsData);
+        } else {
+          // For TODAY, use getMyStats (default)
+          myStatsData = await agentAPI.getMyStats();
+          console.log('Fetched TODAY stats:', myStatsData);
+        }
+        console.log('Setting agentStats state to:', myStatsData);
         setAgentStats(myStatsData);
         if (myStatsData) {
           setCurrentAgentRank(myStatsData.rank);
@@ -192,7 +206,7 @@ const AgentDashboard: React.FC<AgentDashboardProps> = ({ agent, period, agents =
       }
     };
     fetchDashboardData();
-  }, []);
+  }, [period]);
 
   // ============================================================================
   // Client Management
@@ -252,13 +266,17 @@ const AgentDashboard: React.FC<AgentDashboardProps> = ({ agent, period, agents =
   const paidTimeHours = agentStats ? agentStats.totalPaidTimeHours : (talkHours + waitHours); // Simplified fallback
   const estimatedEarnings = agentStats ? agentStats.estimatedEarnings.toFixed(2) : ((paidTimeHours * (agent?.hourlyRate || 0)).toFixed(2));
   
+  // Debug logging
+  console.log('AgentDashboard render - agentStats:', agentStats);
+  console.log('AgentDashboard render - talkHours:', talkHours, 'waitHours:', waitHours, 'paidTimeHours:', paidTimeHours);
+  
   // Disposition analysis data for pie chart
-  // Note: If API doesn't provide granular dispositions yet, keep using props or defaults
+  // Map API response fields to disposition names
   const dispositionData = [
-    { name: 'Booked', value: stats.dispositions?.booked || 0, color: '#10b981' },
-    { name: 'Callback', value: stats.dispositions?.callback || 0, color: '#3b82f6' },
-    { name: 'No Answer', value: stats.dispositions?.noAnswer || 0, color: '#f59e0b' },
-    { name: 'Not Interested', value: stats.dispositions?.notInterested || 0, color: '#ef4444' },
+    { name: 'Booked', value: agentStats ? agentStats.booked : stats.dispositions?.booked || 0, color: '#10b981' },
+    { name: 'Callback', value: agentStats ? agentStats.callbk : stats.dispositions?.callback || 0, color: '#3b82f6' },
+    { name: 'No Answer', value: agentStats ? agentStats.n : stats.dispositions?.noAnswer || 0, color: '#f59e0b' },
+    { name: 'Not Interested', value: agentStats ? agentStats.ni : stats.dispositions?.notInterested || 0, color: '#ef4444' },
   ];
 
   // Goal tracking - 3 sales per day
@@ -375,7 +393,7 @@ const AgentDashboard: React.FC<AgentDashboardProps> = ({ agent, period, agents =
         />
         <KPICard 
           label="Paid Time" 
-          value={`${paidTimeHours.toFixed(1)}h`} 
+          value={`${talkHours.toFixed(1)}h`} 
           subtext={`Talk: ${talkHours.toFixed(1)}h`}
           /* subtext={`Talk: ${talkHours.toFixed(1)}h |  Wait: ${waitHours.toFixed(1)}h`} */
           color="bg-blue-600"
@@ -537,255 +555,7 @@ const AgentDashboard: React.FC<AgentDashboardProps> = ({ agent, period, agents =
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 rounded-3xl shadow-2xl overflow-hidden border-0">
-        <div className="p-10 border-b border-blue-100 bg-blue-50/60 rounded-t-3xl flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h2 className="text-3xl font-extrabold text-blue-900 tracking-tight uppercase">Client Database</h2>
-            <p className="text-blue-400 text-xs font-black uppercase tracking-widest mt-2">Personal Client Interactions • Live Updates</p>
-          </div>
-          <button 
-            onClick={() => setShowAddClient(true)}
-            className="px-6 py-3 text-sm font-bold text-white rounded-xl transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 bg-blue-600 hover:bg-blue-700"
-          >
-            ➕ Add Client
-          </button>
-        </div>
 
-        {showAddClient ? (
-          <div className="p-10">
-            <AddClientCard 
-              onAddClient={handleAddClient}
-              onCancel={() => setShowAddClient(false)}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 px-10 pb-2">
-              <div className="bg-white border-2 border-blue-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-                <p className="text-xs text-blue-600 font-extrabold uppercase tracking-widest mb-2">Total Clients</p>
-                <p className="text-3xl font-extrabold text-blue-900">{allAgentClients.length}</p>
-              </div>
-              <div className="bg-white border-2 border-amber-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-                <p className="text-xs text-amber-600 font-extrabold uppercase tracking-widest mb-2">Pending</p>
-                <p className="text-3xl font-extrabold text-amber-900">{allAgentClients.filter(c => (c.statut_service || c.statutService) === 'en_attente').length}</p>
-              </div>
-              <div className="bg-white border-2 border-emerald-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-                <p className="text-xs text-emerald-600 font-extrabold uppercase tracking-widest mb-2">Confirmed</p>
-                <p className="text-3xl font-extrabold text-emerald-900">{allAgentClients.filter(c => (c.statut_service || c.statutService) === 'confirme').length}</p>
-              </div>
-              <div className="bg-white border-2 border-red-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-                <p className="text-xs text-red-600 font-extrabold uppercase tracking-widest mb-2">Cancelled</p>
-                <p className="text-3xl font-extrabold text-red-900">{allAgentClients.filter(c => (c.statut_service || c.statutService) === 'annule').length}</p>
-              </div>
-            </div>
-
-            <div className="px-10 py-6 bg-white/50 border-b border-blue-100 flex flex-col sm:flex-row gap-4 items-center flex-wrap">
-              <div className="flex gap-2 flex-wrap">
-                <button
-                  onClick={() => setClientFilter('all')}
-                  className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${
-                    clientFilter === 'all'
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setClientFilter('confirme')}
-                  className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${
-                    clientFilter === 'confirme'
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                  }`}
-                >
-                  Confirmed
-                </button>
-                <button
-                  onClick={() => setClientFilter('en_attente')}
-                  className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${
-                    clientFilter === 'en_attente'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
-                  }`}
-                >
-                  Pending
-                </button>
-                <button
-                  onClick={() => setClientFilter('annule')}
-                  className={`px-4 py-2 text-xs font-black uppercase tracking-widest rounded-lg transition-all ${
-                    clientFilter === 'annule'
-                      ? 'bg-red-600 text-white'
-                      : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200'
-                  }`}
-                >
-                  Cancelled
-                </button>
-              </div>
-
-              <div className="flex gap-3 items-center flex-wrap">
-                <label className="text-sm font-bold text-slate-700">Filter by Date:</label>
-                <input
-                  type="date"
-                  value={clientStartDate}
-                  onChange={(e) => {
-                    setClientStartDate(e.target.value);
-                    setCurrentClientPage(1);
-                  }}
-                  className="px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Start Date"
-                />
-                <span className="text-slate-600 font-bold">to</span>
-                <input
-                  type="date"
-                  value={clientEndDate}
-                  onChange={(e) => {
-                    setClientEndDate(e.target.value);
-                    setCurrentClientPage(1);
-                  }}
-                  className="px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="End Date"
-                />
-                {(clientStartDate || clientEndDate) && (
-                  <button
-                    onClick={() => {
-                      setClientStartDate('');
-                      setClientEndDate('');
-                      setCurrentClientPage(1);
-                    }}
-                    className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-lg transition-all"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="overflow-x-auto mt-8">
-              <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-white/80 backdrop-blur">
-                  <tr className="text-blue-300 text-[10px] uppercase tracking-wider font-extrabold border-b border-slate-100">
-                    <th className="px-4 py-3">Client Name</th>
-                    <th className="px-4 py-3">Contact Info</th>
-                    <th className="px-4 py-3">Service</th>
-                    <th className="px-4 py-3">Created</th>
-                    <th className="px-4 py-3">Visit Date</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {agentClients.map((client) => (
-                    <tr key={client.id} className="hover:bg-slate-50/80 transition-all group">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg shadow-md border border-slate-200 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-black text-xs">
-                            {(client.nom_complet || 'N').charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 text-[11px]">{client.nom_complet || 'N/A'}</p>
-                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">ID: {client.id}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-0.5">
-                          <p className="text-[9px] font-bold text-slate-700 flex items-center gap-1 whitespace-nowrap overflow-hidden text-ellipsis">
-                            <span className="text-blue-600 flex-shrink-0">📧</span>
-                            <span className="truncate">{client.email || 'N/A'}</span>
-                          </p>
-                          <p className="text-[9px] font-bold text-slate-700 flex items-center gap-1">
-                            <span className="text-emerald-600 flex-shrink-0">📱</span> {client.telephone || 'N/A'}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-[9px] font-bold text-slate-900">{client.nom_service || 'N/A'}</p>
-                          {client.adresse && (
-                            <p className="text-[9px] text-slate-400 font-bold mt-0.5 max-w-[150px] truncate">{client.adresse}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-[9px] font-bold text-slate-700 whitespace-nowrap">
-                          {client.date_creation ? new Date(client.date_creation).toLocaleDateString() : 'N/A'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-[9px] font-bold text-slate-700 whitespace-nowrap">
-                          {client.date_visite ? new Date(client.date_visite).toLocaleDateString() : 'Not scheduled'}
-                        </p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-block px-2 py-1 rounded text-[9px] font-bold uppercase ${getStatusColor(client.statut_service)}`}>
-                          {client.statut_service}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleViewClient(client)}
-                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-200 transition-all whitespace-nowrap"
-                        >
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-blue-100 bg-white">
-                <div className="text-xs font-bold text-slate-500">
-                  Page {currentClientPage} of {totalPages} • {allAgentClients.length} total
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setCurrentClientPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentClientPage === 1}
-                    className={`px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${
-                      currentClientPage === 1
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300 active:scale-95'
-                    }`}
-                  >
-                    ← Prev
-                  </button>
-                  <div className="flex gap-1">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                      <button
-                        key={page}
-                        onClick={() => setCurrentClientPage(page)}
-                        className={`w-8 h-8 rounded-lg font-bold text-xs transition-all ${
-                          currentClientPage === page
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => setCurrentClientPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentClientPage === totalPages}
-                    className={`px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${
-                      currentClientPage === totalPages
-                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300 active:scale-95'
-                    }`}
-                  >
-                    Next →
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
 
       {/* Client Details Modal */}
       {showClientModal && selectedClient && (

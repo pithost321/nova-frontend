@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useCreateFormation, useUpdateFormation } from '../src/services/formationHooks';
-import { Formation, FormationType, FormationStatus, Chapter } from '../types';
+import { Formation, FormationType, FormationStatus, Chapter, ContentType } from '../types';
 // @ts-ignore
 import '../styles/FormationForm.css';
 
@@ -17,20 +17,20 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
   const [formData, setFormData] = useState<Formation>({
     title: '',
     description: '',
-    type: FormationType.TECHNICAL,
+    type: FormationType.AGENT,
     duration: 60,
     instructor: null,
     chapters: [],
     targetTeams: [],
     targetAgents: [],
     status: FormationStatus.DRAFT,
-    public: true,
+    publicVisible: true,
   });
 
   const [newChapter, setNewChapter] = useState<Partial<Chapter>>({
     title: '',
     orderIndex: 0,
-    contentType: 'TEXT',
+    contentType: ContentType.TEXT,
     contentUrl: null,
     textContent: '',
   });
@@ -63,7 +63,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
       id: `chapter-${Date.now()}`,
       title: newChapter.title,
       orderIndex: formData.chapters.length,
-      contentType: (newChapter.contentType as 'VIDEO' | 'TEXT' | 'IMAGE' | 'DOCUMENT') || 'TEXT',
+      contentType: (newChapter.contentType as ContentType) || ContentType.TEXT,
       contentUrl: newChapter.contentUrl || null,
       textContent: newChapter.textContent || null,
       duration: newChapter.duration,
@@ -79,7 +79,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
     setNewChapter({ 
       title: '', 
       orderIndex: 0, 
-      contentType: 'TEXT',
+      contentType: ContentType.TEXT,
       contentUrl: null,
       textContent: '',
     });
@@ -154,7 +154,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
     setNewChapter(prev => ({ 
       ...prev, 
       videoUrl,
-      contentType: 'VIDEO',
+      contentType: ContentType.VIDEO,
       contentUrl: videoUrl,
     }));
     alert(`Video "${file.name}" added (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
@@ -169,7 +169,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
     const imageUrl = URL.createObjectURL(file);
     setNewChapter(prev => ({
       ...prev,
-      contentType: 'IMAGE',
+      contentType: ContentType.IMAGE,
       contentUrl: imageUrl,
     }));
     alert(`Image "${file.name}" added`);
@@ -237,11 +237,8 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
                 onChange={handleInputChange}
                 required
               >
-                <option value={FormationType.TECHNICAL}>Technical</option>
-                <option value={FormationType.PRODUCT}>Product</option>
-                <option value={FormationType.PROCESS}>Process</option>
-                <option value={FormationType.COMPLIANCE}>Compliance</option>
-                <option value={FormationType.SOFT_SKILLS}>Soft Skills</option>
+                <option value={FormationType.TEAM}>Team Formation</option>
+                <option value={FormationType.AGENT}>Agent Formation</option>
               </select>
             </div>
 
@@ -330,18 +327,18 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
               <label htmlFor="chapter-content-type">Content Type *</label>
               <select
                 id="chapter-content-type"
-                value={newChapter.contentType || 'TEXT'}
-                onChange={(e) => setNewChapter(prev => ({ ...prev, contentType: e.target.value as 'VIDEO' | 'TEXT' | 'IMAGE' | 'DOCUMENT' }))}
+                value={newChapter.contentType || ContentType.TEXT}
+                onChange={(e) => setNewChapter(prev => ({ ...prev, contentType: e.target.value as ContentType }))}
                 required
               >
-                <option value="TEXT">Text Content</option>
-                <option value="VIDEO">Video</option>
-                <option value="IMAGE">Image</option>
-                <option value="DOCUMENT">Document</option>
+                <option value={ContentType.TEXT}>Text Content</option>
+                <option value={ContentType.VIDEO}>Video</option>
+                <option value={ContentType.IMAGE}>Image</option>
+                <option value={ContentType.DOCUMENT}>Document</option>
               </select>
             </div>
 
-            {newChapter.contentType === 'TEXT' && (
+            {newChapter.contentType === ContentType.TEXT && (
               <div className="form-group">
                 <label htmlFor="chapter-text-content">Text Content</label>
                 <textarea
@@ -354,7 +351,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
               </div>
             )}
 
-            {(newChapter.contentType === 'VIDEO' || newChapter.contentType === 'IMAGE' || newChapter.contentType === 'DOCUMENT') && (
+            {(newChapter.contentType === ContentType.VIDEO || newChapter.contentType === ContentType.IMAGE || newChapter.contentType === ContentType.DOCUMENT) && (
               <div className="form-group">
                 <label htmlFor="chapter-content-url">Content URL</label>
                 <input
@@ -384,7 +381,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
             <div className="file-upload-section">
               <h5>Media Uploads</h5>
               
-              {newChapter.contentType === 'VIDEO' && (
+              {newChapter.contentType === ContentType.VIDEO && (
                 <div className="upload-group">
                   <label htmlFor="video-upload" className="upload-label">
                     <span className="upload-icon">📹</span>
@@ -401,7 +398,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
                 </div>
               )}
 
-              {newChapter.contentType === 'IMAGE' && (
+              {newChapter.contentType === ContentType.IMAGE && (
                 <div className="upload-group">
                   <label htmlFor="image-upload" className="upload-label">
                     <span className="upload-icon">🖼️</span>
@@ -418,7 +415,7 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
                 </div>
               )}
 
-              {newChapter.contentType === 'DOCUMENT' && (
+              {newChapter.contentType === ContentType.DOCUMENT && (
                 <div className="upload-group">
                   <label htmlFor="resource-upload" className="upload-label">
                     <span className="upload-icon">📄</span>
@@ -509,8 +506,8 @@ export const FormationForm: React.FC<FormationFormProps> = ({ formation, onSucce
             <label>
               <input
                 type="checkbox"
-                checked={formData.public || false}
-                onChange={(e) => setFormData(prev => ({ ...prev, public: e.target.checked }))}
+                checked={formData.publicVisible || false}
+                onChange={(e) => setFormData(prev => ({ ...prev, publicVisible: e.target.checked }))}
               />
               Public (visible to all users)
             </label>

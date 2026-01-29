@@ -7,7 +7,7 @@
  * - NOVA (HQ): View organizational metrics across all teams
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { UserRole, Agent, Team, TimePeriod, Client } from './types';
 import { dashboardAPI, authAPI, agentAPI, teamAPI, clientAPI } from './src/services/apiService';
@@ -17,10 +17,12 @@ import AgentDashboard from './components/AgentDashboard';
 import TeamDashboard from './components/TeamDashboard';
 import HQDashboard from './components/HQDashboard';
 import AgentLeaderboard from './components/AgentLeaderboard';
+import AgentDetailPage from './components/AgentDetailPage';
 import FormationList from './components/FormationList';
 import { FormationDetail } from './components/FormationDetail';
 import FormationManagement from './components/FormationManagement';
 import FormationLearner from './components/FormationLearner';
+import ClientDatabase from './components/ClientDatabase';
 
 /**
  * Data Status Component - Shows connection health and last update time
@@ -56,14 +58,16 @@ const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [currentRole, setCurrentRole] = useState<UserRole>(UserRole.AGENT);
+  const [currentUserTeam, setCurrentUserTeam] = useState<string>('');
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
 
   // ============================================================================
   // Application State
   // ============================================================================
   const [timePeriod, setTimePeriod] = useState<TimePeriod>(TimePeriod.TODAY);
-  const [currentView, setCurrentView] = useState<'dashboard' | 'leaderboard' | 'formations' | 'formation-detail' | 'formation-learner' | 'management'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'leaderboard' | 'agent-detail' | 'formations' | 'formation-detail' | 'formation-learner' | 'management' | 'client-database'>('dashboard');
   const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null);
+  const [selectedAgentDetail, setSelectedAgentDetail] = useState<{ id: number; name: string } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(window.innerWidth >= 1024);
 
   // Data loading state
@@ -212,24 +216,22 @@ const App: React.FC = () => {
   // ============================================================================
   // Data Fetching from Backend
   // ============================================================================
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!isAuthenticated || isAuthLoading) return;
+  const fetchDashboardData = useCallback(async () => {
+    if (!isAuthenticated || isAuthLoading) return;
 
-      try {
-        setLoading(true);
-        setError(null);
-        setIsHealthy(true);
+    try {
+      setLoading(true);
+      setError(null);
+      setIsHealthy(true);
 
-        try {
-          // Fetch data based on user role
-          if (currentRole === UserRole.AGENT) {
-            // For AGENT role: use my-stats, top-5, and clients
-            const [myStatsData, top5Data, clientsData] = await Promise.all([
-              agentAPI.getMyStats(currentUserEmail),
-              agentAPI.getTop5Agents(),
-              clientAPI.getAllClients(),
-            ]);
+      // Fetch data based on user role
+      if (currentRole === UserRole.AGENT) {
+          // For AGENT role: use my-stats, top-5, and clients
+          const [myStatsData, top5Data, clientsData] = await Promise.all([
+            agentAPI.getMyStats(currentUserEmail),
+            agentAPI.getTop5Agents(),
+            clientAPI.getAllClients(),
+          ]);
             
             console.log('My stats data:', myStatsData);
             console.log('Top 5 data:', top5Data);
@@ -266,8 +268,8 @@ const App: React.FC = () => {
                   calls: a.totalCalls ?? a.calls ?? 0,
                   costPerHour: a.costPerHour ?? 0,
                   campaign: a.campaign ?? '',
-                  mostCurrentUserGroup: a.mostCurrentUserGroup ?? '',
-                  most_recent_user_group: a.most_recent_user_group ?? '',
+                  mostCurrentUserGroup: a.mostCurrentUserGroup ?? a.userGroup ?? a.teamName ?? '',
+                  most_recent_user_group: a.most_recent_user_group ?? a.userGroup ?? a.teamName ?? '',
                   SALE: a.sale ?? 0,
                   callbk: a.callbk ?? 0,
                   N: a.n ?? a.N ?? 0,
@@ -331,10 +333,14 @@ const App: React.FC = () => {
               
               setAgents(transformedAgents);
               
-              // Select the current agent
+              // Select the current agent and extract team
               const myAgent = transformedAgents.find(a => a.email === currentUserEmail || a.name === currentUserEmail);
               if (myAgent) {
                 setSelectedAgentId(myAgent.id);
+                // Set the current user's team from the agent's mostCurrentUserGroup
+                if (myAgent.mostCurrentUserGroup) {
+                  setCurrentUserTeam(myAgent.mostCurrentUserGroup);
+                }
               }
             }
             
@@ -385,6 +391,8 @@ const App: React.FC = () => {
                 const myTeam = transformedTeams.find((t: any) => t.teamName === currentUserEmail);
                 if (myTeam) {
                   setSelectedTeamId(myTeam.teamName);
+                  // Set the current user's team
+                  setCurrentUserTeam(myTeam.teamName);
                 }
               } else if (transformedTeams.length > 0 && !selectedTeamId) {
                 setSelectedTeamId(transformedTeams[0].teamName);
@@ -427,25 +435,22 @@ const App: React.FC = () => {
           }
           
           setLastUpdated(new Date());
-        } catch (backendErr) {
-          console.warn('Backend fetch failed, using mock data:', backendErr);
+        } catch (err) {
+          console.error('Failed to fetch dashboard data:', err);
           setError('Using demo data');
+          setIsHealthy(false);
+        } finally {
+          setLoading(false);
         }
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
-        setError('Using demo data');
-        setIsHealthy(false);
-      } finally {
-        setLoading(false);
-      }
-    };
+  }, [isAuthenticated, isAuthLoading, currentRole, currentUserEmail]);
 
+  // Call fetchDashboardData on mount and when dependencies change
+  useEffect(() => {
     fetchDashboardData();
 
-    // Auto-refresh every 2 minutes (120 seconds)
-    const interval = setInterval(fetchDashboardData, 120000);
-    return () => clearInterval(interval);
-  }, [isAuthenticated, isAuthLoading]);
+    // No auto-refresh - user must click 'Actualise' button to refresh
+    return () => {};
+  }, [fetchDashboardData]);
 
   // ============================================================================
   // Event Handlers
@@ -467,6 +472,43 @@ const App: React.FC = () => {
   // Render Helpers
   // ============================================================================
   const renderDashboard = () => {
+    // Show client database when client-database view is selected
+    if (currentView === 'client-database') {
+      return (
+        <ClientDatabase
+          clients={clients}
+          userRole={currentRole}
+          currentUserEmail={currentUserEmail}
+          currentUserTeam={currentUserTeam}
+          onAddClient={async (clientData) => {
+            try {
+              await clientAPI.createClient({
+                nom_complet: clientData.nom_complet,
+                email: clientData.email,
+                telephone: clientData.telephone,
+                adresse: clientData.adresse,
+                code_postal: clientData.code_postal,
+                commentaire: clientData.commentaire,
+                date_visite: clientData.date_visite,
+                nom_service: clientData.nom_service,
+                statut_service: 'en_attente',
+                agent: {
+                  username: currentUserEmail,
+                  campaign: '',
+                  teamName: currentUserTeam,
+                }
+              });
+              // Refresh the clients list after adding
+              const updatedClients = await clientAPI.getAllClients();
+              setClients(updatedClients);
+            } catch (error) {
+              console.error('Error adding client:', error);
+            }
+          }}
+        />
+      );
+    }
+
     // Show formation management for NOVA users
     if (currentView === 'management') {
       return currentRole === UserRole.NOVA ? (
@@ -514,9 +556,30 @@ const App: React.FC = () => {
       );
     }
 
+    // Show agent detail page when selected
+    if (currentView === 'agent-detail' && selectedAgentDetail) {
+      return (
+        <AgentDetailPage
+          agentId={selectedAgentDetail.id}
+          agentName={selectedAgentDetail.name}
+          onClose={() => {
+            setCurrentView('leaderboard');
+            setSelectedAgentDetail(null);
+          }}
+        />
+      );
+    }
+
     // Show leaderboard when leaderboard view is selected
     if (currentView === 'leaderboard') {
-      return <AgentLeaderboard />;
+      return (
+        <AgentLeaderboard
+          onSelectAgent={(agentId, agentName) => {
+            setSelectedAgentDetail({ id: agentId, name: agentName });
+            setCurrentView('agent-detail');
+          }}
+        />
+      );
     }
 
     switch (currentRole) {
@@ -634,7 +697,70 @@ const App: React.FC = () => {
                   {[TimePeriod.TODAY, TimePeriod.WEEK, TimePeriod.MONTH].map((period) => (
                     <button
                       key={period}
-                      onClick={() => setTimePeriod(period)}
+                      onClick={async () => {
+                        setTimePeriod(period);
+                        // Call API for WEEK period and update agent data
+                        if (period === TimePeriod.WEEK && currentAgent) {
+                          try {
+                            const weekData = await agentAPI.getHistory('WEEK');
+                            console.log('Week data received:', weekData);
+                            // Update the current agent with week data
+                            setAgents((prevAgents) =>
+                              prevAgents.map((agent) =>
+                                agent.id === currentAgent.id
+                                  ? {
+                                      ...agent,
+                                      calls: weekData.totalCalls || 0,
+                                      stats: {
+                                        day: agent.stats?.day || {
+                                          calls: 0,
+                                          booked: 0,
+                                          talkTimeMinutes: 0,
+                                          waitTimeMinutes: 0,
+                                          paidPauseHours: 0,
+                                          dispositions: {
+                                            booked: 0,
+                                            callback: 0,
+                                            noAnswer: 0,
+                                            notInterested: 0,
+                                          },
+                                        },
+                                        week: {
+                                          calls: weekData.totalCalls || 0,
+                                          booked: weekData.booked || 0,
+                                          talkTimeMinutes: Math.round((weekData.talkTimeHours || 0) * 60),
+                                          waitTimeMinutes: Math.round((weekData.waitTimeHours || 0) * 60),
+                                          paidPauseHours: 0,
+                                          dispositions: {
+                                            booked: weekData.booked || 0,
+                                            callback: weekData.callbk || 0,
+                                            noAnswer: weekData.n || 0,
+                                            notInterested: weekData.ni || 0,
+                                          },
+                                        },
+                                        month: agent.stats?.month || {
+                                          calls: 0,
+                                          booked: 0,
+                                          talkTimeMinutes: 0,
+                                          waitTimeMinutes: 0,
+                                          paidPauseHours: 0,
+                                          dispositions: {
+                                            booked: 0,
+                                            callback: 0,
+                                            noAnswer: 0,
+                                            notInterested: 0,
+                                          },
+                                        },
+                                      },
+                                    }
+                                  : agent
+                              )
+                            );
+                          } catch (err) {
+                            console.error('Error fetching week history:', err);
+                          }
+                        }
+                      }}
                       className={`px-4 py-1.5 text-xs font-bold rounded-md uppercase tracking-widest transition-all ${
                         timePeriod === period
                           ? 'bg-white text-blue-600 shadow-sm'
@@ -648,8 +774,16 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {/* Data Status Indicator */}
-              <div className="hidden md:block pl-4 border-l border-slate-200">
+              {/* Actualise Button and Data Status */}
+              <div className="hidden md:flex items-center gap-4">
+                <button
+                  onClick={fetchDashboardData}
+                  disabled={loading}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed rounded-lg transition-all shadow-sm"
+                  title="Refresh dashboard data"
+                >
+                  {loading ? 'Actualising...' : 'Actualise'}
+                </button>
                 <DataStatus
                   lastUpdated={lastUpdated}
                   loading={loading}

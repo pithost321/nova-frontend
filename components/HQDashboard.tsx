@@ -87,9 +87,10 @@ interface HQDashboardProps {
   agents: Agent[];
   period: TimePeriod;
   clients?: Client[];
+  periodStats?: any;
 }
 
-const HQDashboard: React.FC<HQDashboardProps> = ({ teams, agents, period, clients = [] }) => {
+const HQDashboard: React.FC<HQDashboardProps> = ({ teams, agents, period, clients = [], periodStats }) => {
   // Notification state
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
@@ -140,10 +141,41 @@ const HQDashboard: React.FC<HQDashboardProps> = ({ teams, agents, period, client
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        const [statsData, clientsResponse] = await Promise.all([
-          novaAPI.getMyStats(),
-          clientAPI.getAllClients()
-        ]);
+        let statsData: NovaStatsDTO;
+        
+        // Use periodStats if available (from period button click), otherwise fetch default
+        if (periodStats) {
+          // Convert API response to NovaStatsDTO format
+          console.log('HQDashboard: Using periodStats:', {
+            calls: periodStats.grandTotalCalls,
+            booked: periodStats.grandTotalBooked,
+            period: period
+          });
+          statsData = {
+            novaName: periodStats.novaName || 'admin_nova',
+            teamCount: periodStats.teamCount || 0,
+            grandTotalAgentCount: periodStats.grandTotalAgentCount || 0,
+            grandTotalCalls: periodStats.grandTotalCalls || 0,
+            grandTotalBooked: periodStats.grandTotalBooked || 0,
+            grandTotalSales: periodStats.grandTotalBooked || 0,
+            grandTotalTalkTimeHours: periodStats.grandTotalTalkTimeHours || 0,
+            grandTotalWaitTimeHours: periodStats.grandTotalWaitTimeHours || 0,
+            grandTotalEarnings: periodStats.grandTotalEarnings || 0,
+            top3Teams: periodStats.top3Teams || [],
+            top3Agents: periodStats.top3Agents || [],
+            teamsList: periodStats.teamsList || [],
+          };
+          console.log('HQDashboard: Converted to statsData - calls:', statsData.grandTotalCalls);
+        } else {
+          // Fetch default stats for TODAY
+          console.log('HQDashboard: Fetching default stats for period:', period);
+          statsData = await novaAPI.getMyStats();
+          console.log('HQDashboard: Fetched default stats - calls:', statsData.grandTotalCalls);
+        }
+        
+        const clientsResponse = await clientAPI.getAllClients();
+        
+        console.log('HQDashboard: Setting novaStats - calls:', statsData.grandTotalCalls, 'booked:', statsData.grandTotalBooked);
         setNovaStats(statsData);
         setClientsData(clientsResponse);
       } catch (error) {
@@ -154,6 +186,29 @@ const HQDashboard: React.FC<HQDashboardProps> = ({ teams, agents, period, client
     };
 
     fetchData();
+  }, [periodStats]);
+
+  // Initial load when component mounts - fetch default stats
+  useEffect(() => {
+    if (!periodStats && !novaStats) {
+      const fetchInitial = async () => {
+        try {
+          setIsLoading(true);
+          const [statsData, clientsResponse] = await Promise.all([
+            novaAPI.getMyStats(),
+            clientAPI.getAllClients()
+          ]);
+          console.log('HQDashboard: Initial load - calls:', statsData.grandTotalCalls);
+          setNovaStats(statsData);
+          setClientsData(clientsResponse);
+        } catch (error) {
+          console.error('Error in initial load:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchInitial();
+    }
   }, []);
 
   // Map frontend status to backend and vice versa
@@ -463,10 +518,10 @@ const HQDashboard: React.FC<HQDashboardProps> = ({ teams, agents, period, client
   const teamStats = (novaStats?.teamsList || teams).map(t => ({
     name: t.teamName,
     rank: t.rank,
-    bookings: t.totalSales,
-    calls: t.totalCalls,
-    agentCount: t.agentCount,
-    conversion: t.totalCalls > 0 ? (t.totalSales / t.totalCalls * 100) : 0
+    bookings: t.totalSales || 0,
+    calls: t.totalCalls || 0,
+    agentCount: t.agentCount || 0,
+    conversion: t.totalCalls > 0 ? ((t.totalSales || 0) / t.totalCalls * 100) : 0
   })).sort((a, b) => b.bookings - a.bookings);
 
   const allAgentsFromAPI = (novaStats && Array.isArray(novaStats.teamsList) ? novaStats.teamsList : []).flatMap(t =>
@@ -929,268 +984,7 @@ const HQDashboard: React.FC<HQDashboardProps> = ({ teams, agents, period, client
           </table>
       </div>
 
-      {/* Client Database Section */}
-      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 rounded-3xl shadow-2xl overflow-hidden border-0">
-        <div className="p-10 border-b border-blue-100 bg-blue-50/60 rounded-t-3xl flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h2 className="text-3xl font-extrabold text-blue-900 tracking-tight uppercase">Client Database</h2>
-            <p className="text-blue-400 text-xs font-black uppercase tracking-widest mt-2">Recent Client Interactions • Live Updates</p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              aria-label="Import Recordings"
-              onClick={handleImportRecordings}
-              disabled={isImportingRecordings}
-              className={`px-6 py-3 text-sm font-bold text-white rounded-xl transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 ${
-                isImportingRecordings 
-                  ? 'bg-slate-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              {isImportingRecordings ? 'Importing...' : '📥 Import Recordings'}
-            </button>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 px-10 pb-2">
-          <div className="bg-white border-2 border-blue-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-blue-600 font-extrabold uppercase tracking-widest mb-2">Total Clients</p>
-            <p className="text-3xl font-extrabold text-blue-900">{clientStats.total}</p>
-          </div>
-          <div className="bg-white border-2 border-amber-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-amber-600 font-extrabold uppercase tracking-widest mb-2">Pending</p>
-            <p className="text-3xl font-extrabold text-amber-900">{clientStats.pending}</p>
-          </div>
-          <div className="bg-white border-2 border-emerald-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-emerald-600 font-extrabold uppercase tracking-widest mb-2">Confirmed</p>
-            <p className="text-3xl font-extrabold text-emerald-900">{clientStats.confirmed}</p>
-          </div>
-          <div className="bg-white border-2 border-slate-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-slate-600 font-extrabold uppercase tracking-widest mb-2">Completed</p>
-            <p className="text-3xl font-extrabold text-slate-900">{clientStats.completed}</p>
-          </div>
-        </div>
-
-        {/* Date Range Filter */}
-        <div className="px-10 py-6 bg-white/50 border-b border-blue-100 flex flex-col sm:flex-row gap-4 items-center">
-          <label className="text-sm font-bold text-slate-700">Filter by Date:</label>
-          <div className="flex gap-3 items-center flex-wrap">
-            <input
-              type="date"
-              value={clientStartDate}
-              onChange={(e) => {
-                setClientStartDate(e.target.value);
-                setClientPage(1);
-              }}
-              className="px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Start Date"
-            />
-            <span className="text-slate-600 font-bold">to</span>
-            <input
-              type="date"
-              value={clientEndDate}
-              onChange={(e) => {
-                setClientEndDate(e.target.value);
-                setClientPage(1);
-              }}
-              className="px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="End Date"
-            />
-            {(clientStartDate || clientEndDate) && (
-              <button
-                onClick={() => {
-                  setClientStartDate('');
-                  setClientEndDate('');
-                  setClientPage(1);
-                }}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-lg transition-all"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Client Table */}
-        <div className="overflow-x-auto mt-8">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-white/80 backdrop-blur">
-              <tr className="text-blue-300 text-[10px] uppercase tracking-wider font-extrabold">
-                <th className="px-2 py-2 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => { setClientSortField('nom_complet'); setClientSortOrder(clientSortField === 'nom_complet' && clientSortOrder === 'asc' ? 'desc' : 'asc'); }}>Client Name {clientSortField === 'nom_complet' && (clientSortOrder === 'asc' ? '▲' : '▼')}</th>
-                <th className="px-2 py-2">Contact Info</th>
-                <th className="px-2 py-2 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => { setClientSortField('agent'); setClientSortOrder(clientSortField === 'agent' && clientSortOrder === 'asc' ? 'desc' : 'asc'); }}>Agent {clientSortField === 'agent' && (clientSortOrder === 'asc' ? '▲' : '▼')}</th>
-                <th className="px-2 py-2">Service</th>
-                <th className="px-2 py-2 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => { setClientSortField('date_visite'); setClientSortOrder(clientSortField === 'date_visite' && clientSortOrder === 'asc' ? 'desc' : 'asc'); }}>Visit Date {clientSortField === 'date_visite' && (clientSortOrder === 'asc' ? '▲' : '▼')}</th>
-                <th className="px-2 py-2 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => { setClientSortField('date_creation'); setClientSortOrder(clientSortField === 'date_creation' && clientSortOrder === 'asc' ? 'desc' : 'asc'); }}>Creation Date {clientSortField === 'date_creation' && (clientSortOrder === 'asc' ? '▲' : '▼')}</th>
-                <th className="px-2 py-2 cursor-pointer hover:text-blue-600 transition-colors" onClick={() => { setClientSortField('statut_service'); setClientSortOrder(clientSortField === 'statut_service' && clientSortOrder === 'asc' ? 'desc' : 'asc'); }}>Status {clientSortField === 'statut_service' && (clientSortOrder === 'asc' ? '▲' : '▼')}</th>
-                <th className="px-2 py-2">Recording</th>
-                <th className="px-2 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {(() => {
-                const totalPages = Math.ceil(sortedRecentClients.length / clientsPerPage);
-                const indexOfLastClient = clientPage * clientsPerPage;
-                const indexOfFirstClient = indexOfLastClient - clientsPerPage;
-                const paginatedClients = sortedRecentClients.slice(indexOfFirstClient, indexOfLastClient);
-                
-                return paginatedClients.map((client) => {
-                const initials = (client.nom_complet || client.nomComplet || 'N/A').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-                
-                // --- 1. Dynamic Status Handling ---
-                const currentStatus = client.statut_service || client.statutService || 'en_attente';
-
-                return (
-                  <tr key={client.id} className="hover:bg-slate-50/80 transition-all group">
-                    <td className="px-2 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg shadow-md border border-slate-200 bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-black text-[9px]">
-                          {initials}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900 text-[11px]">{client.nom_complet || client.nomComplet || 'N/A'}</p>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">ID: {client.id}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="space-y-0.5">
-                        <p className="text-[9px] font-bold text-slate-700 flex items-center gap-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
-                          <span className="text-blue-600 flex-shrink-0">📧</span> <span className="truncate">{client.email || 'N/A'}</span>
-                        </p>
-                        <p className="text-[9px] font-bold text-slate-700 flex items-center gap-0.5">
-                          <span className="text-emerald-600 flex-shrink-0">📱</span> {client.telephone || 'N/A'}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-900">{client.agent?.username || 'N/A'}</p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">{client.agent?.campaign || 'N/A'}</p>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-900">{client.nom_service || 'N/A'}</p>
-                        <p className="text-[9px] text-slate-400 font-bold mt-0.5 max-w-[150px] truncate">{client.adresse || 'N/A'}</p>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <p className="text-[9px] font-bold text-slate-700 whitespace-nowrap">{client.date_visite || 'Not scheduled'}</p>
-                    </td>
-                    <td className="px-2 py-2">
-                      <p className="text-[9px] font-bold text-slate-700 whitespace-nowrap">{client.date_creation || 'N/A'}</p>
-                    </td>
-                    
-                    {/* --- 2. Status Dropdown --- */}
-                    <td className="px-2 py-2">
-                      <div className="relative">
-                        <select
-                          value={currentStatus}
-                          onChange={(e) => handleStatusChange(client.id, e.target.value)}
-                          className={`
-                            appearance-none pl-2 pr-6 py-1 rounded-lg text-[9px] font-black uppercase cursor-pointer border border-2 focus:outline-none focus:ring-2 focus:ring-offset-1 transition-all
-                            ${getStatusColor(currentStatus)}
-                          `}
-                        >
-                          <option value="en_attente">Pending</option>
-                          <option value="confirme">Confirmed</option>
-                          <option value="annule">Cancelled</option>
-                          <option value="termine">Completed</option>
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                          <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-2 py-2">
-                      {client.recordingUrl ? (
-                        <a 
-                          href={client.recordingUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-[9px] font-bold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
-                        >
-                          🎧 Listen
-                        </a>
-                      ) : (
-                        <span className="text-[9px] text-slate-400 whitespace-nowrap">No recording</span>
-                      )}
-                    </td>
-
-                    {/* --- 3. Actions Column with Edit Button --- */}
-                    <td className="px-2 py-2 text-right">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() => openEditModal(client)}
-                          className="px-2 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[9px] font-bold uppercase rounded border border-amber-200 transition-all whitespace-nowrap"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-200 transition-all whitespace-nowrap"
-                          onClick={() => {
-                            setSelectedClient(client);
-                            setShowViewModal(true);
-                          }}
-                        >
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClient(client.id, client.nom_complet || 'Unknown')}
-                          className="px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-[9px] font-bold uppercase rounded border border-red-200 transition-all whitespace-nowrap"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              });
-              })()}
-            </tbody>
-          </table>
-          {sortedRecentClients.length > clientsPerPage && (
-            <div className="flex items-center justify-between p-6 border-t border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-              <div className="text-xs text-blue-600 font-extrabold">
-                Showing {Math.min((clientPage - 1) * clientsPerPage + 1, sortedRecentClients.length)}-{Math.min(clientPage * clientsPerPage, sortedRecentClients.length)} of {sortedRecentClients.length} clients
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setClientPage(prev => Math.max(1, prev - 1))}
-                  disabled={clientPage === 1}
-                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 font-black text-sm transition-all"
-                >
-                  Previous
-                </button>
-                <div className="flex gap-1">
-                  {Array.from({ length: Math.ceil(sortedRecentClients.length / clientsPerPage) }, (_, i) => i + 1).map(pageNum => (
-                    <button
-                      key={pageNum}
-                      onClick={() => setClientPage(pageNum)}
-                      className={`w-10 h-10 rounded-lg font-black text-sm transition-all ${
-                        clientPage === pageNum
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setClientPage(prev => Math.min(Math.ceil(sortedRecentClients.length / clientsPerPage), prev + 1))}
-                  disabled={clientPage === Math.ceil(sortedRecentClients.length / clientsPerPage)}
-                  className="px-4 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed text-slate-900 font-black text-sm transition-all"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
       
       {/* View Client Modal */}
       {showViewModal && selectedClient && (

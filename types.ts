@@ -1,4 +1,11 @@
 // ============================================================================
+// TYPE ALIASES & UTILITIES
+// ============================================================================
+
+// LocalDateTime from Java is serialized as ISO-8601 string
+export type LocalDateTime = string;  // ISO-8601 format: yyyy-MM-ddTHH:mm:ss
+
+// ============================================================================
 // USER ROLES
 // ============================================================================
 
@@ -79,6 +86,33 @@ export interface Agent {
       };
     };
   };
+}
+
+// ============================================================================
+// AGENT HISTORY (from backend entity - time series snapshot data)
+// ============================================================================
+
+export interface AgentHistory {
+  id?: number;
+  vicidialId: number;
+  username: string;
+  userGroup: string;
+  campaign: string;
+  calls: number;
+  time?: string; // LocalTime as string (HH:mm:ss)
+  pause?: string; // LocalTime as string
+  wait?: string; // LocalTime as string
+  talk?: string; // LocalTime as string
+  dispo?: string; // LocalTime as string
+  dead?: string; // LocalTime as string
+  sale: number;
+  callbk: number;
+  ni: number;
+  n: number;
+  costPerHour: number;
+  totalPaidHours: number;
+  dailyEarnings: number;
+  snapshotDate: string; // LocalDateTime as ISO string
 }
 
 export interface Team {
@@ -164,6 +198,7 @@ export interface Client {
     username?: string;
     campaign?: string;
     teamName?: string;
+    mostCurrentUserGroup?: string;
   };
   nomComplet?: string;
   statutService?: string;
@@ -199,11 +234,8 @@ export interface TeamStatsDTO {
 // ============================================================================
 
 export enum FormationType {
-  TECHNICAL = 'TECHNICAL',
-  PRODUCT = 'PRODUCT',
-  PROCESS = 'PROCESS',
-  COMPLIANCE = 'COMPLIANCE',
-  SOFT_SKILLS = 'SOFT_SKILLS'
+  TEAM = 'TEAM',
+  AGENT = 'AGENT'
 }
 
 export enum FormationStatus {
@@ -215,15 +247,21 @@ export enum FormationStatus {
 export enum SessionStatus {
   ENROLLED = 'ENROLLED',
   IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  ABANDONED = 'ABANDONED'
+  COMPLETED = 'COMPLETED'
+}
+
+export enum ContentType {
+  VIDEO = 'VIDEO',
+  TEXT = 'TEXT',
+  IMAGE = 'IMAGE',
+  DOCUMENT = 'DOCUMENT'
 }
 
 export interface Chapter {
   id?: string;
   title: string;
   orderIndex: number;
-  contentType: 'VIDEO' | 'TEXT' | 'IMAGE' | 'DOCUMENT';
+  contentType: ContentType;
   contentUrl?: string | null;
   textContent?: string | null;
   description?: string;
@@ -240,15 +278,15 @@ export interface Formation {
   duration: number;
   instructor?: string | null;
   createdBy?: string;
-  createdDate?: string;
+  createdDate?: string | LocalDateTime;
   status: FormationStatus;
   chapters: Chapter[];
   targetTeams?: string[];
   targetAgents?: string[];
-  public?: boolean;
+  publicVisible?: boolean;
 }
 
-export interface FormationDTO {
+export interface FormationDto {
   id?: string;
   title: string;
   description: string;
@@ -258,42 +296,45 @@ export interface FormationDTO {
   createdBy?: string;
   createdDate?: string;
   status: FormationStatus;
-  chapters?: ChapterDTO[];
+  chapters?: ChapterDto[];
   targetTeams?: string[];
   targetAgents?: string[];
+  publicVisible?: boolean;
 }
 
-export interface ChapterDTO {
+export interface ChapterDto {
   id?: string;
   title: string;
-  description?: string;
-  content?: string;
   orderIndex: number;
-  duration?: number;
-  videoUrl?: string;
-  resources?: string[];
+  contentType: ContentType;
+  contentUrl?: string | null;
+  textContent?: string | null;
 }
 
 export interface FormationSession {
   id?: string;
   formationId: string;
   userId: string;
-  userType: string;
+  userType?: FormationType;
   status: SessionStatus;
   completionPercentage: number;
-  currentChapterId?: string;
+  currentChapterId?: string | null;
   completedChapterIds: string[];
   startDate?: string;
-  endDate?: string;
-  notes?: string;
+  endDate?: string | null;
+  notes?: string | null;
 }
 
 export interface FormationSessionDTO {
   id?: string;
   formationId: string;
   userId: string;
+  userType?: FormationType;
   status: SessionStatus;
   completionPercentage: number;
-  currentChapterId?: string;
-  completedChapterIds?: string[];
+  currentChapterId?: string | null;
+  completedChapterIds: string[];
+  startDate?: string;
+  endDate?: string | null;
+  notes?: string | null;
 }

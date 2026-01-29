@@ -26,12 +26,37 @@ export const FormationList: React.FC<FormationListProps> = ({ onFormationClick, 
 
   const handleEnroll = async (formationId: string) => {
     try {
+      const userRole = localStorage.getItem('userRole');
+      console.log('[FormationList] Enrolling in formation:', formationId);
+      console.log('[FormationList] Current user role:', userRole);
+      
       await enrollFormation(formationId);
       alert('Successfully enrolled in formation!');
+      console.log('[FormationList] Enrollment successful, refetching...');
       refetch();
-    } catch (err) {
-      console.error('Failed to enroll:', err);
-      alert('Failed to enroll in formation');
+    } catch (err: any) {
+      const userRole = localStorage.getItem('userRole');
+      console.error('[FormationList] Enrollment failed:', {
+        formationId,
+        status: err.response?.status,
+        message: err.message,
+        data: err.response?.data,
+        userRole
+      });
+      
+      let errorMsg = 'Failed to enroll in formation';
+      
+      if (userRole === 'NOVA' && err.response?.status === 403) {
+        errorMsg = 'NOVA (Admin) users cannot enroll.\nSwitch to AGENT/TEAM account to enroll.';
+      } else if (err.response?.status === 403) {
+        errorMsg = `You do not have permission to enroll (403) - Role: ${userRole}`;
+      } else if (err.response?.status === 401) {
+        errorMsg = 'Please log in again (401)';
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      }
+      
+      alert(errorMsg);
     }
   };
 
@@ -50,16 +75,10 @@ export const FormationList: React.FC<FormationListProps> = ({ onFormationClick, 
 
   const getTypeColor = (type: FormationType): string => {
     switch (type) {
-      case FormationType.TECHNICAL:
+      case FormationType.TEAM:
         return '#3498db';
-      case FormationType.PRODUCT:
+      case FormationType.AGENT:
         return '#e74c3c';
-      case FormationType.PROCESS:
-        return '#f39c12';
-      case FormationType.COMPLIANCE:
-        return '#9b59b6';
-      case FormationType.SOFT_SKILLS:
-        return '#1abc9c';
       default:
         return '#95a5a6';
     }
@@ -102,11 +121,8 @@ export const FormationList: React.FC<FormationListProps> = ({ onFormationClick, 
             className="type-filter"
           >
             <option value="ALL">All Types</option>
-            <option value={FormationType.TECHNICAL}>Technical</option>
-            <option value={FormationType.PRODUCT}>Product</option>
-            <option value={FormationType.PROCESS}>Process</option>
-            <option value={FormationType.COMPLIANCE}>Compliance</option>
-            <option value={FormationType.SOFT_SKILLS}>Soft Skills</option>
+            <option value={FormationType.TEAM}>Team Formation</option>
+            <option value={FormationType.AGENT}>Agent Formation</option>
           </select>
         </div>
       </div>

@@ -192,11 +192,8 @@ export const FormationManagement: React.FC<FormationManagementProps> = ({ userRo
             className="filter-select"
           >
             <option value="ALL">All Types</option>
-            <option value={FormationType.TECHNICAL}>Technical</option>
-            <option value={FormationType.PRODUCT}>Product</option>
-            <option value={FormationType.PROCESS}>Process</option>
-            <option value={FormationType.COMPLIANCE}>Compliance</option>
-            <option value={FormationType.SOFT_SKILLS}>Soft Skills</option>
+            <option value={FormationType.TEAM}>Team Formation</option>
+            <option value={FormationType.AGENT}>Agent Formation</option>
           </select>
         </div>
       </div>

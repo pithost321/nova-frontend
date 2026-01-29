@@ -263,8 +263,14 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({
       try {
         const topTeamsResponse = await teamAPI.getTop5Teams();
         setTopTeams(topTeamsResponse);
-      } catch (error) {
-        console.error('Error fetching top teams:', error);
+      } catch (error: any) {
+        // 403 Forbidden - TEAM users don't have access to this endpoint
+        if (error?.response?.status === 403) {
+          console.log('Top 5 teams endpoint not available for current role');
+          setTopTeams([]);
+        } else {
+          console.error('Error fetching top teams:', error);
+        }
       }
     };
 
@@ -272,6 +278,49 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({
     fetchTopTeams();
     // Removed legacy fetchTeamStats call
   }, [team.teamName]);
+
+  // ============================================================================
+  // Fetch Team History based on Period
+  // ============================================================================
+  // DISABLED: Team history API call returning 403 Forbidden
+  /*
+  useEffect(() => {
+    console.log('TeamDashboard period changed to:', period, 'team.id:', team?.id);
+    
+    const fetchTeamHistory = async () => {
+      try {
+        if (team?.id === undefined || team?.id === null) {
+          console.log('No team.id available, skipping fetch');
+          return;
+        }
+        
+        console.log('Fetching team history for period:', period);
+        let historyData;
+        if (period === TimePeriod.WEEK) {
+          historyData = await teamAPI.getHistory(team.id, 'WEEK');
+          console.log('Fetched WEEK team stats:', historyData);
+        } else if (period === TimePeriod.MONTH) {
+          historyData = await teamAPI.getHistory(team.id, 'MONTH');
+          console.log('Fetched MONTH team stats:', historyData);
+        } else {
+          // For TODAY, use getMyTeamStats
+          historyData = await teamAPI.getMyTeamStats();
+          console.log('Fetched TODAY team stats:', historyData);
+        }
+        
+        if (historyData) {
+          console.log('Setting team data with history:', historyData);
+          setTeamData(historyData as unknown as Team);
+          setTeamAgentsData(historyData.agentsList || []);
+        }
+      } catch (error) {
+        console.error('Error fetching team history:', error);
+      }
+    };
+    
+    fetchTeamHistory();
+  }, [period, team?.id]);
+  */
 
   // ============================================================================
   // Helper Functions
@@ -797,229 +846,7 @@ const TeamDashboard: React.FC<TeamDashboardProps> = ({
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 rounded-3xl shadow-2xl overflow-hidden border-0">
-        <div className="p-10 border-b border-blue-100 bg-blue-50/60 rounded-t-3xl flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <div>
-            <h2 className="text-3xl font-extrabold text-blue-900 tracking-tight uppercase">Client Database</h2>
-            <p className="text-blue-400 text-xs font-black uppercase tracking-widest mt-2">Team Client Interactions • Live Updates</p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              aria-label="Import Recordings"
-              onClick={handleImportRecordings}
-              disabled={isImportingRecordings}
-              className={`px-6 py-3 text-sm font-bold text-white rounded-xl transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 ${
-                isImportingRecordings 
-                  ? 'bg-slate-400 cursor-not-allowed' 
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              {isImportingRecordings ? 'Importing...' : '📥 Import Recordings'}
-            </button>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 px-10 pb-2">
-          <div className="bg-white border-2 border-blue-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-blue-600 font-extrabold uppercase tracking-widest mb-2">Total Clients</p>
-            <p className="text-3xl font-extrabold text-blue-900">{clientStats.total}</p>
-          </div>
-          <div className="bg-white border-2 border-amber-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-amber-600 font-extrabold uppercase tracking-widest mb-2">Pending</p>
-            <p className="text-3xl font-extrabold text-amber-900">{clientStats.pending}</p>
-          </div>
-          <div className="bg-white border-2 border-emerald-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-emerald-600 font-extrabold uppercase tracking-widest mb-2">Confirmed</p>
-            <p className="text-3xl font-extrabold text-emerald-900">{clientStats.confirmed}</p>
-          </div>
-          <div className="bg-white border-2 border-slate-300 p-6 rounded-2xl shadow-md text-center hover:scale-105 hover:shadow-xl transition-all">
-            <p className="text-xs text-slate-600 font-extrabold uppercase tracking-widest mb-2">Completed</p>
-            <p className="text-3xl font-extrabold text-slate-900">{clientStats.completed}</p>
-          </div>
-        </div>
 
-        {/* Date Range Filter */}
-        <div className="px-10 py-6 bg-white/50 border-b border-blue-100 flex flex-col sm:flex-row gap-4 items-center">
-          <label className="text-sm font-bold text-slate-700">Filter by Date:</label>
-          <div className="flex gap-3 items-center flex-wrap">
-            <input
-              type="date"
-              value={clientStartDate}
-              onChange={(e) => {
-                setClientStartDate(e.target.value);
-                setCurrentClientPage(1);
-              }}
-              className="px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Start Date"
-            />
-            <span className="text-slate-600 font-bold">to</span>
-            <input
-              type="date"
-              value={clientEndDate}
-              onChange={(e) => {
-                setClientEndDate(e.target.value);
-                setCurrentClientPage(1);
-              }}
-              className="px-3 py-2 border-2 border-slate-200 rounded-lg text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="End Date"
-            />
-            {(clientStartDate || clientEndDate) && (
-              <button
-                onClick={() => {
-                  setClientStartDate('');
-                  setClientEndDate('');
-                  setCurrentClientPage(1);
-                }}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-bold rounded-lg transition-all"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto mt-8">
-          <table className="w-full text-left text-sm">
-            <thead className="sticky top-0 z-10 bg-white/80 backdrop-blur">
-              <tr className="text-blue-300 text-[10px] uppercase tracking-wider font-extrabold">
-                <th className="px-2 py-2">Client Name</th>
-                <th className="px-2 py-2">Contact Info</th>
-                <th className="px-2 py-2">Agent</th>
-                <th className="px-2 py-2">Service</th>
-                <th className="px-2 py-2">Visit Date</th>
-                <th className="px-2 py-2">Status</th>
-                <th className="px-2 py-2">Recording</th>
-                <th className="px-2 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {teamClients.map((client) => {
-                return (
-                  <tr key={client.id} className="hover:bg-slate-50/80 transition-all group">
-                    <td className="px-2 py-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg shadow-md border border-slate-200 bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center text-white font-black text-[9px]">
-                          {(client.nom_complet || client.nomComplet || 'N/A').charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900 text-[11px]">{client.nom_complet || client.nomComplet || 'N/A'}</p>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">ID: {client.id}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div className="space-y-0.5">
-                        <p className="text-[9px] font-bold text-slate-700 flex items-center gap-0.5 whitespace-nowrap overflow-hidden text-ellipsis">
-                          <span className="text-blue-600 flex-shrink-0">📧</span> <span className="truncate">{client.email}</span>
-                        </p>
-                        <p className="text-[9px] font-bold text-slate-700 flex items-center gap-0.5">
-                          <span className="text-emerald-600 flex-shrink-0">📱</span> {client.telephone}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-900">{client.agent?.username || 'N/A'}</p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">{client.agent?.campaign || ''}</p>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <div>
-                        <p className="text-[9px] font-bold text-slate-900">{client.nom_service || 'N/A'}</p>
-                        {client.adresse && (
-                          <p className="text-[9px] text-slate-400 font-bold mt-0.5 max-w-[150px] truncate">{client.adresse}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-2 py-2">
-                      <p className="text-[9px] font-bold text-slate-700 whitespace-nowrap">
-                        {client.date_visite || 'Not scheduled'}
-                      </p>
-                    </td>
-                    <td className="px-2 py-2">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${getStatusColor(client.statut_service || client.statutService || '')}`}>
-                        {getStatusLabel(client.statut_service || client.statutService || '')}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2">
-                      {client.recordingUrl ? (
-                        <a
-                          href={client.recordingUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[9px] font-bold text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
-                        >
-                          🎧 Listen
-                        </a>
-                      ) : (
-                        <span className="text-[9px] text-slate-400 whitespace-nowrap">No recording</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 text-right">
-                      <button 
-                        onClick={() => {
-                          setSelectedClient(client);
-                          setShowViewModal(true);
-                        }}
-                        className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[9px] font-bold uppercase rounded border border-blue-200 transition-all whitespace-nowrap"
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {/* Pagination Controls */}
-          {totalClientPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-blue-100 bg-white">
-              <div className="text-xs font-bold text-slate-500">
-                Page {currentClientPage} of {totalClientPages} • {filteredClients.length} total
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setCurrentClientPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentClientPage === 1}
-                  className={`px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${
-                    currentClientPage === 1
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300 active:scale-95'
-                  }`}
-                >
-                  ← Prev
-                </button>
-                <div className="flex gap-1">
-                  {Array.from({ length: totalClientPages }, (_, i) => i + 1).map(page => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentClientPage(page)}
-                      className={`w-8 h-8 rounded-lg font-bold text-xs transition-all ${
-                        currentClientPage === page
-                          ? 'bg-blue-600 text-white shadow-md'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200 active:scale-95'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => setCurrentClientPage(prev => Math.min(totalClientPages, prev + 1))}
-                  disabled={currentClientPage === totalClientPages}
-                  className={`px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all ${
-                    currentClientPage === totalClientPages
-                      ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300 active:scale-95'
-                  }`}
-                >
-                  Next →
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
 
       {/* Add Agent Modal */}
       {showAddAgentModal && (

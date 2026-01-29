@@ -231,14 +231,22 @@ export const useEnrollFormation = () => {
   const enrollFormation = useCallback(async (formationId: string) => {
     try {
       setLoading(true);
+      console.log('[useEnrollFormation] Starting enrollment for:', formationId);
       const created = await formationsAPI.enrollFormation(formationId);
       setSession(created);
       setError(null);
+      console.log('[useEnrollFormation] Success:', created);
       return created;
-    } catch (err) {
+    } catch (err: any) {
       const error = err as Error;
       setError(error);
-      console.error('Error enrolling in formation:', err);
+      console.error('[useEnrollFormation] Failed:', {
+        message: error.message,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.config?.url,
+        formationId
+      });
       throw error;
     } finally {
       setLoading(false);
